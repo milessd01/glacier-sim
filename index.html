@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Glacier Simulator - Mendenhall Glacier</title>
+    <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+    <div id="canvas-container"></div>
+    
+    <div id="ui-overlay">
+        <div id="info-panel">
+            <h1>Mendenhall Glacier</h1>
+            <div id="coordinates">58.4°N, 134.6°W</div>
+            
+            <div class="section">
+                <h2>Weather</h2>
+                <div id="weather-source" class="weather-label">Loading...</div>
+                <div id="stale-warning" class="stale-warning" style="display: none;"></div>
+                <div id="last-updated" class="last-updated"></div>
+                <div class="weather-row">
+                    <span>Temperature:</span>
+                    <span id="temperature">--</span>°C
+                </div>
+                <div class="weather-row">
+                    <span>Wind Speed:</span>
+                    <span id="wind-speed">--</span> km/h
+                </div>
+                <div class="weather-row">
+                    <span>Precipitation:</span>
+                    <span id="precipitation">--</span> mm
+                </div>
+            </div>
+            
+            <div class="section">
+                <h2>Glacier Status</h2>
+                <div class="status-row">
+                    <span>State:</span>
+                    <span id="glacier-state" class="state-badge">--</span>
+                </div>
+                <div class="status-row">
+                    <span>Mass Index:</span>
+                    <span id="mass-index">100.0</span>
+                </div>
+                <div class="status-row">
+                    <span>Daily Change:</span>
+                    <span id="daily-change">0.0</span>
+                </div>
+                <div class="status-row">
+                    <span>7-Day Trend:</span>
+                    <span id="seven-day-trend">0.0</span>
+                </div>
+            </div>
+        </div>
+        
+        <div id="controls-panel">
+            <h2>Controls</h2>
+            
+            <div class="control-group">
+                <label for="speed-slider">
+                    Simulation Speed: <span id="speed-value">1.0</span>x
+                </label>
+                <input type="range" id="speed-slider" min="0.1" max="5" step="0.1" value="1">
+            </div>
+            
+            <div class="control-group">
+                <label for="exaggeration-slider">
+                    Exaggeration: <span id="exaggeration-value">1.0</span>x
+                </label>
+                <input type="range" id="exaggeration-slider" min="0.5" max="3" step="0.1" value="1">
+            </div>
+            
+            <div class="control-group">
+                <button id="weather-toggle" class="btn btn-secondary">Use Mock Weather</button>
+                <button id="refresh-weather" class="btn btn-primary">Refresh Weather</button>
+                <button id="reset-glacier" class="btn btn-warning">Reset Glacier</button>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
