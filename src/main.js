@@ -15,6 +15,18 @@ let baselineSnapshot = null;
 let lastObservedDateKey = null;
 let lastObservedData = null;
 
+const infoPanel = document.getElementById('info-panel');
+const infoButton = document.getElementById('glacier-info');
+const infoHome = document.getElementById('info-home');
+
+function showInfoPanel(show) {
+  if (!infoPanel) return;
+  infoPanel.classList.toggle('hidden', !show);
+}
+
+infoButton?.addEventListener('click', () => showInfoPanel(true));
+infoHome?.addEventListener('click', () => showInfoPanel(false));
+
 function toDateKey(date) {
   if (!(date instanceof Date)) return null;
   return date.toISOString().slice(0, 10);
