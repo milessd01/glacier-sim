@@ -1,179 +1,280 @@
-/**
- * UI module - Handles all overlay controls and data display
- */
+import Chart from 'chart.js/auto';
 
-export class UI {
-    constructor() {
-        this.elements = {};
-        this.init();
-    }
+const formatNumber = (value, digits = 1) =>
+  Number.isFinite(value) ? value.toFixed(digits) : '--';
 
-    /**
-     * Initialize UI elements and event listeners
-     */
-    init() {
-        // Info display elements
-        this.elements.temperature = document.getElementById('temperature');
-        this.elements.windSpeed = document.getElementById('wind-speed');
-        this.elements.precipitation = document.getElementById('precipitation');
-        this.elements.glacierState = document.getElementById('glacier-state');
-        this.elements.massIndex = document.getElementById('mass-index');
-        this.elements.dailyChange = document.getElementById('daily-change');
-        this.elements.sevenDayTrend = document.getElementById('seven-day-trend');
-        this.elements.weatherSource = document.getElementById('weather-source');
-        this.elements.lastUpdated = document.getElementById('last-updated');
-        this.elements.staleWarning = document.getElementById('stale-warning');
-        
-        // Control elements
-        this.elements.speedSlider = document.getElementById('speed-slider');
-        this.elements.speedValue = document.getElementById('speed-value');
-        this.elements.exaggerationSlider = document.getElementById('exaggeration-slider');
-        this.elements.exaggerationValue = document.getElementById('exaggeration-value');
-        this.elements.weatherToggle = document.getElementById('weather-toggle');
-        this.elements.refreshWeather = document.getElementById('refresh-weather');
-        this.elements.resetGlacier = document.getElementById('reset-glacier');
-        
-        // Set up event listeners
-        this.setupEventListeners();
-    }
+const formatDateTime = (date, timezoneAbbr) => {
+  if (!(date instanceof Date)) return '--';
+  const options = {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  };
+  return `${date.toLocaleString(undefined, options)} ${timezoneAbbr || ''}`.trim();
+};
 
-    /**
-     * Set up all event listeners
-     */
-    setupEventListeners() {
-        // Speed slider
-        this.elements.speedSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.elements.speedValue.textContent = value.toFixed(1);
-            this._onSpeedChange?.(value);
-        });
-        
-        // Exaggeration slider
-        this.elements.exaggerationSlider.addEventListener('input', (e) => {
-            const value = parseFloat(e.target.value);
-            this.elements.exaggerationValue.textContent = value.toFixed(1);
-            this._onExaggerationChange?.(value);
-        });
-        
-        // Weather toggle
-        this.elements.weatherToggle.addEventListener('click', () => {
-            this._onWeatherToggle?.();
-        });
-        
-        // Refresh weather
-        this.elements.refreshWeather.addEventListener('click', () => {
-            this._onRefreshWeather?.();
-        });
-        
-        // Reset glacier
-        this.elements.resetGlacier.addEventListener('click', () => {
-            this._onResetGlacier?.();
-        });
-    }
+export class DashboardUI {
+  constructor() {
+    this.elements = this.cacheElements();
+    this.currentScenario = null;
+    this.chartWindowDays = 30;
+    this.bindEvents();
+    this.initCharts();
+    this.setChartWindow(this.chartWindowDays);
+  }
 
-    /**
-     * Update weather display
-     */
-    updateWeather(weather, source, lastUpdated) {
-        this.elements.temperature.textContent = weather.temperature.toFixed(1);
-        this.elements.windSpeed.textContent = weather.windSpeed.toFixed(1);
-        this.elements.precipitation.textContent = weather.precipitation.toFixed(2);
-        
-        // Update weather source label
-        if (source === 'real') {
-            this.elements.weatherSource.textContent = 'Real Weather Data';
-            this.elements.weatherSource.className = 'weather-label real';
-        } else if (source === 'mock') {
-            this.elements.weatherSource.textContent = 'Mock Weather Data';
-            this.elements.weatherSource.className = 'weather-label mock';
-        } else {
-            this.elements.weatherSource.textContent = 'Mock Weather (API Failed)';
-            this.elements.weatherSource.className = 'weather-label mock-fallback';
-        }
-        
-        // Update last updated timestamp
-        if (lastUpdated && this.elements.lastUpdated) {
-            const date = new Date(lastUpdated);
-            const formattedDate = date.toLocaleString(undefined, {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                timeZoneName: 'short'
-            });
-            this.elements.lastUpdated.textContent = `Updated: ${formattedDate}`;
-            
-            // Check if data is stale (older than 2 hours)
-            if (this.elements.staleWarning) {
-                const now = new Date();
-                const ageHours = (now - date) / (1000 * 60 * 60);
-                
-                if (ageHours > 2 && source === 'real') {
-                    this.elements.staleWarning.style.display = 'block';
-                    this.elements.staleWarning.textContent = `⚠️ Stale data (${ageHours.toFixed(1)}h old)`;
-                } else {
-                    this.elements.staleWarning.style.display = 'none';
-                }
+  cacheElements() {
+    return {
+      temperature: document.getElementById('temperature'),
+      windSpeed: document.getElementById('wind-speed'),
+      precipitation: document.getElementById('precipitation'),
+      humidity: document.getElementById('humidity'),
+      pressure: document.getElementById('pressure'),
+      timestamp: document.getElementById('timestamp'),
+      dataStatus: document.getElementById('data-status'),
+      glacierState: document.getElementById('glacier-state'),
+      healthIndex: document.getElementById('health-index'),
+      dailyChange: document.getElementById('daily-change'),
+      sevenDayTrend: document.getElementById('seven-day-trend'),
+      summary: document.getElementById('daily-summary'),
+      simulateButtons: document.querySelectorAll('[data-simulate]'),
+      refreshButton: document.getElementById('refresh-weather'),
+      simulationSource: document.getElementById('simulation-source'),
+      scenarioStatus: document.getElementById('scenario-status'),
+      scenarioButtons: document.querySelectorAll('[data-scenario]'),
+      chartWindowHealth: document.getElementById('chart-window-health'),
+      chartWindowMass: document.getElementById('chart-window-mass'),
+      chartHealth: document.getElementById('chart-health'),
+      chartMass: document.getElementById('chart-mass')
+    };
+  }
+
+  bindEvents() {
+    this.elements.refreshButton?.addEventListener('click', () => {
+      this.onRefreshCallback?.();
+    });
+
+    this.elements.simulateButtons?.forEach((button) => {
+      button.addEventListener('click', () => {
+        const days = Number(button.dataset.simulate || 1);
+        this.onSimulateCallback?.(days);
+      });
+    });
+
+    this.elements.scenarioButtons?.forEach((button) => {
+      button.addEventListener('click', () => {
+        this.setScenario(button.dataset.scenario);
+        this.onScenarioSelectCallback?.(this.currentScenario);
+      });
+    });
+
+  }
+
+  initCharts() {
+    this.healthChart = new Chart(this.elements.chartHealth, {
+      type: 'line',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Health Index',
+            data: [],
+            borderColor: '#4aa3ff',
+            backgroundColor: 'rgba(74, 163, 255, 0.2)',
+            tension: 0.35,
+            fill: true,
+            pointRadius: 3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: false,
+            grid: {
+              color: 'rgba(255,255,255,0.08)'
             }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
         }
-    }
+      }
+    });
 
-    /**
-     * Update glacier status display
-     */
-    updateGlacierStatus(state, massIndex, dailyChange, sevenDayTrend) {
-        this.elements.glacierState.textContent = state;
-        this.elements.massIndex.textContent = massIndex.toFixed(2);
-        
-        // Format daily change with sign
-        const sign = dailyChange >= 0 ? '+' : '';
-        this.elements.dailyChange.textContent = `${sign}${dailyChange.toFixed(2)}`;
-        
-        // Format 7-day trend with sign
-        if (this.elements.sevenDayTrend && sevenDayTrend !== undefined) {
-            const trendSign = sevenDayTrend >= 0 ? '+' : '';
-            this.elements.sevenDayTrend.textContent = `${trendSign}${sevenDayTrend.toFixed(2)}`;
+    this.massChart = new Chart(this.elements.chartMass, {
+      type: 'bar',
+      data: {
+        labels: [],
+        datasets: [
+          {
+            label: 'Daily Mass Change',
+            data: [],
+            backgroundColor: (ctx) => {
+              const value = ctx.raw ?? 0;
+              return value >= 0 ? 'rgba(120, 214, 167, 0.7)' : 'rgba(255, 99, 99, 0.7)';
+            }
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: {
+            display: false
+          }
+        },
+        scales: {
+          y: {
+            grid: {
+              color: 'rgba(255,255,255,0.08)'
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            }
+          }
         }
-        
-        // Update state badge color
-        this.elements.glacierState.className = 'state-badge';
-        if (state === 'Advancing') {
-            this.elements.glacierState.classList.add('advancing');
-        } else if (state === 'Receding') {
-            this.elements.glacierState.classList.add('receding');
-        } else {
-            this.elements.glacierState.classList.add('stable');
-        }
-    }
+      }
+    });
+  }
 
-    /**
-     * Update weather toggle button text
-     */
-    updateWeatherToggleButton(isUsingMock) {
-        this.elements.weatherToggle.textContent = isUsingMock 
-            ? 'Use Real Weather' 
-            : 'Use Mock Weather';
-    }
+  updateCurrentConditions(result) {
+    if (!result.ok || !result.data) return;
+    const {
+      temperature,
+      windSpeed,
+      precipitation,
+      humidity,
+      pressure,
+      date,
+      timezoneAbbr
+    } = result.data;
+    this.elements.temperature.textContent = formatNumber(temperature, 1);
+    this.elements.windSpeed.textContent = formatNumber(windSpeed, 1);
+    this.elements.precipitation.textContent = formatNumber(precipitation, 2);
+    this.elements.humidity.textContent = formatNumber(humidity, 0);
+    this.elements.pressure.textContent = formatNumber(pressure, 0);
+    this.elements.timestamp.textContent = formatDateTime(date, timezoneAbbr);
+  }
 
-    // Callback setters
-    set onSpeedChange(callback) {
-        this._onSpeedChange = callback;
+  updateDataStatus(result) {
+    if (!this.elements.dataStatus) return;
+    if (result.mode === 'scenario') {
+      this.elements.dataStatus.textContent = 'Scenario mode';
+      this.elements.dataStatus.className = 'status-pill fallback';
+      this.setScenarioMode(true);
+      return;
     }
+    if (result.ok) {
+      this.elements.dataStatus.textContent = 'Live data';
+      this.elements.dataStatus.className = 'status-pill live';
+      this.setScenarioMode(false);
+    } else {
+      this.elements.dataStatus.textContent = 'Fallback mode';
+      this.elements.dataStatus.className = 'status-pill fallback';
+      this.setScenarioMode(false);
+    }
+  }
 
-    set onExaggerationChange(callback) {
-        this._onExaggerationChange = callback;
-    }
+  updateSimulationSource(result) {
+    if (!this.elements.simulationSource) return;
+    this.elements.simulationSource.textContent = `Simulation source: ${result.sourceLabel}`;
+  }
 
-    set onWeatherToggle(callback) {
-        this._onWeatherToggle = callback;
+  updateScenarioStatus(label) {
+    if (this.elements.scenarioStatus) {
+      this.elements.scenarioStatus.textContent = `Scenario: ${label}`;
     }
+  }
 
-    set onRefreshWeather(callback) {
-        this._onRefreshWeather = callback;
-    }
+  updateModelOutputs(state) {
+    this.elements.healthIndex.textContent = formatNumber(state.healthIndex, 1);
+    this.elements.dailyChange.textContent = formatNumber(state.dailyChange, 2);
+    this.elements.sevenDayTrend.textContent = formatNumber(state.sevenDayTrend, 2);
+    this.elements.glacierState.textContent = state.state;
+    this.elements.glacierState.className = `badge ${state.state.toLowerCase()}`;
+  }
 
-    set onResetGlacier(callback) {
-        this._onResetGlacier = callback;
+  updateCharts(history) {
+    const windowDays = this.chartWindowDays || 30;
+    const sliced = history.slice(-windowDays);
+    const labels = sliced.map((entry) =>
+      entry.date instanceof Date
+        ? entry.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+        : '--'
+    );
+    const healthData = sliced.map((entry) => entry.healthIndex);
+    const massData = sliced.map((entry) => entry.dailyChange);
+
+    this.healthChart.data.labels = labels;
+    this.healthChart.data.datasets[0].data = healthData;
+    this.healthChart.update();
+
+    this.massChart.data.labels = labels;
+    this.massChart.data.datasets[0].data = massData;
+    this.massChart.update();
+  }
+
+  updateDailySummary(text) {
+    if (this.elements.summary) {
+      this.elements.summary.textContent = text;
     }
+  }
+
+  onRefresh(callback) {
+    this.onRefreshCallback = callback;
+  }
+
+  onSimulate(callback) {
+    this.onSimulateCallback = callback;
+  }
+
+  onScenarioSimulate(callback) {
+    this.onScenarioSimulateCallback = callback;
+  }
+
+  onScenarioSelect(callback) {
+    this.onScenarioSelectCallback = callback;
+  }
+
+  setScenario(value) {
+    this.currentScenario = value;
+    this.elements.scenarioButtons?.forEach((button) => {
+      const isActive = button.dataset.scenario === value;
+      button.classList.toggle('active', isActive);
+    });
+  }
+
+  setScenarioMode(enabled) {
+    this.elements.simulateButtons?.forEach((button) => {
+      button.disabled = enabled;
+      button.classList.toggle('disabled', enabled);
+    });
+
+    if (!enabled) {
+      this.setScenario(null);
+    }
+  }
+
+  setChartWindow(days) {
+    this.chartWindowDays = days;
+    if (this.elements.chartWindowHealth) {
+      this.elements.chartWindowHealth.textContent = String(days);
+    }
+    if (this.elements.chartWindowMass) {
+      this.elements.chartWindowMass.textContent = String(days);
+    }
+  }
 }

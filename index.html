@@ -1,84 +1,112 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Glacier Simulator - Mendenhall Glacier</title>
-    <link rel="stylesheet" href="/src/styles.css">
-</head>
-<body>
-    <div id="canvas-container"></div>
-    
-    <div id="ui-overlay">
-        <div id="info-panel">
-            <h1>Mendenhall Glacier</h1>
-            <div id="coordinates">58.4°N, 134.6°W</div>
-            
-            <div class="section">
-                <h2>Weather</h2>
-                <div id="weather-source" class="weather-label">Loading...</div>
-                <div id="stale-warning" class="stale-warning" style="display: none;"></div>
-                <div id="last-updated" class="last-updated"></div>
-                <div class="weather-row">
-                    <span>Temperature:</span>
-                    <span id="temperature">--</span>°C
-                </div>
-                <div class="weather-row">
-                    <span>Wind Speed:</span>
-                    <span id="wind-speed">--</span> km/h
-                </div>
-                <div class="weather-row">
-                    <span>Precipitation:</span>
-                    <span id="precipitation">--</span> mm
-                </div>
-            </div>
-            
-            <div class="section">
-                <h2>Glacier Status</h2>
-                <div class="status-row">
-                    <span>State:</span>
-                    <span id="glacier-state" class="state-badge">--</span>
-                </div>
-                <div class="status-row">
-                    <span>Mass Index:</span>
-                    <span id="mass-index">100.0</span>
-                </div>
-                <div class="status-row">
-                    <span>Daily Change:</span>
-                    <span id="daily-change">0.0</span>
-                </div>
-                <div class="status-row">
-                    <span>7-Day Trend:</span>
-                    <span id="seven-day-trend">0.0</span>
-                </div>
-            </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Glacier Mission Control</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+  </head>
+  <body>
+    <main class="app">
+      <header class="header">
+        <div>
+          <p class="eyebrow">Glacier Mission Control</p>
+          <h1>Mendenhall Glacier Operations</h1>
+          <p class="subtitle">Live atmospheric inputs and mass-balance diagnostics.</p>
         </div>
-        
-        <div id="controls-panel">
-            <h2>Controls</h2>
-            
-            <div class="control-group">
-                <label for="speed-slider">
-                    Simulation Speed: <span id="speed-value">1.0</span>x
-                </label>
-                <input type="range" id="speed-slider" min="0.1" max="5" step="0.1" value="1">
-            </div>
-            
-            <div class="control-group">
-                <label for="exaggeration-slider">
-                    Exaggeration: <span id="exaggeration-value">1.0</span>x
-                </label>
-                <input type="range" id="exaggeration-slider" min="0.5" max="3" step="0.1" value="1">
-            </div>
-            
-            <div class="control-group">
-                <button id="weather-toggle" class="btn btn-secondary">Use Mock Weather</button>
-                <button id="refresh-weather" class="btn btn-primary">Refresh Weather</button>
-                <button id="reset-glacier" class="btn btn-warning">Reset Glacier</button>
-            </div>
+        <div class="header-actions">
+          <button id="refresh-weather" class="btn btn-primary">Refresh Data</button>
+          <span id="data-status" class="status-pill live">Live data</span>
         </div>
-    </div>
-    
+      </header>
+
+      <section class="grid">
+        <article class="card">
+          <h2>Current Conditions</h2>
+          <div class="metric-row">
+            <span>Temperature</span>
+            <strong><span id="temperature">--</span>°C</strong>
+          </div>
+          <div class="metric-row">
+            <span>Wind Speed</span>
+            <strong><span id="wind-speed">--</span> km/h</strong>
+          </div>
+          <div class="metric-row">
+            <span>Precipitation</span>
+            <strong><span id="precipitation">--</span> mm</strong>
+          </div>
+          <div class="metric-row">
+            <span>Humidity</span>
+            <strong><span id="humidity">--</span>%</strong>
+          </div>
+          <div class="metric-row">
+            <span>Pressure</span>
+            <strong><span id="pressure">--</span> hPa</strong>
+          </div>
+          <p class="timestamp">Updated: <span id="timestamp">--</span></p>
+        </article>
+
+        <article class="card">
+          <h2>Today's Prediction</h2>
+          <div class="metric-row">
+            <span>Daily Mass Change</span>
+            <strong><span id="daily-change">--</span></strong>
+          </div>
+          <div class="metric-row">
+            <span>Glacier Health Index</span>
+            <strong><span id="health-index">--</span></strong>
+          </div>
+          <div class="metric-row">
+            <span>Glacier State</span>
+            <strong id="glacier-state" class="badge stable">Stable</strong>
+          </div>
+          <p class="hint">Snowfall only counts when temperature is &lt;= 1C.</p>
+        </article>
+
+        <article class="card">
+          <h2>Trend</h2>
+          <div class="metric-row">
+            <span>7-Day Rolling Trend</span>
+            <strong><span id="seven-day-trend">--</span></strong>
+          </div>
+          <p id="simulation-source" class="hint">Simulation source: Observed</p>
+          <div class="button-row">
+            <button class="btn btn-secondary" data-simulate="1">Simulate 1 Day</button>
+            <button class="btn btn-secondary" data-simulate="7">Simulate 7 Days</button>
+            <button class="btn btn-secondary" data-simulate="30">Simulate 30 Days</button>
+          </div>
+        </article>
+
+        <article class="card">
+          <h2>Scenario Simulations</h2>
+          <p class="hint">Run alternate climate paths, then simulate days.</p>
+          <div class="button-row">
+            <button class="btn btn-secondary scenario-btn" data-scenario="ice-age">Ice Age</button>
+            <button class="btn btn-secondary scenario-btn" data-scenario="warming">More Warming</button>
+          </div>
+          <p class="hint">Each scenario runs a 7-day simulation.</p>
+          <p id="scenario-status" class="hint">Scenario: Live baseline</p>
+        </article>
+
+        <article class="card chart-card">
+          <h2>Glacier Health Index (<span id="chart-window-health">30</span> Days)</h2>
+          <canvas id="chart-health" height="160"></canvas>
+        </article>
+
+        <article class="card chart-card">
+          <h2>Daily Mass Change (<span id="chart-window-mass">30</span> Days)</h2>
+          <canvas id="chart-mass" height="160"></canvas>
+        </article>
+
+        <article class="card summary-card">
+          <h2>Daily Summary</h2>
+          <p id="daily-summary">
+            Loading the latest mission brief for Mendenhall Glacier.
+          </p>
+        </article>
+      </section>
+    </main>
+
     <script type="module" src="/src/main.js"></script>
-</body>
+  </body>
 </html>

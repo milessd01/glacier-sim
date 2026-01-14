@@ -1,179 +1,127 @@
-/**
- * Main application entry point
- * Orchestrates scene initialization, animation loop, and module coordination
- */
+import { WeatherService } from './weather.js';
+import { GlacierModel } from './model.js';
+import { DashboardUI } from './ui.js';
 
-import * as THREE from 'three';
-import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
-import { PMREMGenerator } from 'three';
-import { Glacier } from './glacier.js';
-import { Weather } from './weather.js';
-import { UI } from './ui.js';
+const weather = new WeatherService({
+  latitude: 58.4,
+  longitude: -134.4,
+  name: 'Mendenhall Glacier',
+  timezone: 'auto'
+});
 
-class GlacierSimulator {
-    constructor() {
-        this.glacier = null;
-        this.weather = null;
-        this.ui = null;
-        
-        this.simulationSpeed = 1.0;
-        this.lastUpdateTime = 0;
-        this.dailyTickInterval = 10; // 10 seconds = 1 simulated day (for demo purposes)
-        this.dailyTickAccumulator = 0;
-        
-        this.init();
-    }
+const model = new GlacierModel();
+const ui = new DashboardUI();
+let baselineSnapshot = null;
+let lastObservedDateKey = null;
+let lastObservedData = null;
 
-    /**
-     * Initialize all modules
-     */
-    async init() {
-        // Get container
-        const container = document.getElementById('canvas-container');
-        
-        // Initialize modules
-        this.glacier = new Glacier(container);
-        this.weather = new Weather();
-        this.ui = new UI();
-        
-        // Set up environment map for realistic reflections
-        await this.setupEnvironmentMap();
-        
-        // Set up UI callbacks
-        this.setupUICallbacks();
-        
-        // Load initial weather
-        await this.refreshWeather();
-        
-        // Process initial daily tick to calculate glacier state
-        this.processDailyTick();
-        
-        // Start animation loop
-        this.animate();
-    }
-    
-    /**
-     * Set up environment map using RoomEnvironment and PMREMGenerator
-     */
-    async setupEnvironmentMap() {
-        try {
-            const pmremGenerator = new PMREMGenerator(this.glacier.renderer);
-            pmremGenerator.compileEquirectangularShader();
-            
-            const environment = new RoomEnvironment();
-            const envMap = pmremGenerator.fromScene(environment, 0.04).texture;
-            
-            // Apply environment map to glacier
-            this.glacier.setEnvironmentMap(envMap);
-            
-            // Cleanup
-            environment.dispose();
-            pmremGenerator.dispose();
-        } catch (error) {
-            console.warn('Failed to setup environment map:', error);
-            // Continue without environment map - glacier will still render
-        }
-    }
-
-    /**
-     * Set up UI event callbacks
-     */
-    setupUICallbacks() {
-        // Simulation speed
-        this.ui.onSpeedChange = (speed) => {
-            this.simulationSpeed = speed;
-        };
-        
-        // Exaggeration
-        this.ui.onExaggerationChange = (exaggeration) => {
-            this.glacier.setExaggeration(exaggeration);
-        };
-        
-        // Weather toggle
-        this.ui.onWeatherToggle = async () => {
-            const weatherData = await this.weather.toggleMock();
-            this.ui.updateWeather(weatherData, weatherData.source, weatherData.lastUpdated);
-            this.ui.updateWeatherToggleButton(this.weather.isUsingMock());
-        };
-        
-        // Refresh weather
-        this.ui.onRefreshWeather = () => {
-            this.refreshWeather();
-        };
-        
-        // Reset glacier
-        this.ui.onResetGlacier = () => {
-            this.glacier.reset();
-            this.updateUI();
-        };
-    }
-
-    /**
-     * Refresh weather data and update UI
-     */
-    async refreshWeather() {
-        const weatherData = await this.weather.fetchWeather();
-        this.ui.updateWeather(weatherData, weatherData.source, weatherData.lastUpdated);
-        this.ui.updateWeatherToggleButton(this.weather.isUsingMock());
-    }
-
-    /**
-     * Update UI with current glacier state
-     */
-    updateUI() {
-        const state = this.glacier.getState();
-        this.ui.updateGlacierStatus(
-            state.state,
-            state.massIndex,
-            state.dailyChange,
-            state.sevenDayTrend
-        );
-    }
-
-    /**
-     * Process daily tick (mass balance update)
-     */
-    processDailyTick() {
-        const weather = this.weather.getWeather();
-        this.glacier.updateMassBalance(weather);
-        this.updateUI();
-    }
-
-    /**
-     * Main animation loop
-     */
-    animate() {
-        requestAnimationFrame(() => this.animate());
-        
-        const currentTime = performance.now() / 1000; // Convert to seconds
-        const deltaTime = currentTime - this.lastUpdateTime;
-        this.lastUpdateTime = currentTime;
-        
-        // Apply simulation speed
-        const scaledDeltaTime = deltaTime * this.simulationSpeed;
-        
-        // Accumulate time for daily ticks
-        this.dailyTickAccumulator += scaledDeltaTime;
-        
-        // Process daily tick if enough time has passed
-        if (this.dailyTickAccumulator >= this.dailyTickInterval) {
-            this.processDailyTick();
-            this.dailyTickAccumulator = 0;
-        }
-        
-        // Update glacier animation
-        this.glacier.update(scaledDeltaTime);
-        
-        // Render
-        this.glacier.render();
-    }
+function toDateKey(date) {
+  if (!(date instanceof Date)) return null;
+  return date.toISOString().slice(0, 10);
 }
 
-// Start the application when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
-        new GlacierSimulator();
+async function loadCurrentConditions(reset = false) {
+  const result = await weather.fetchCurrent();
+  ui.updateCurrentConditions(result);
+  ui.updateDataStatus(result);
+
+  if (result.ok && result.data) {
+    const dateKey = toDateKey(result.data.date);
+    const shouldAdvance = dateKey && dateKey !== lastObservedDateKey;
+    if (reset || shouldAdvance) {
+      model.resetWithObservation(result.data, result.sourceLabel);
+      baselineSnapshot = model.getSnapshot();
+      lastObservedDateKey = dateKey;
+      lastObservedData = result.data;
+    }
+
+    ui.updateModelOutputs(model.getState());
+    ui.setChartWindow(30);
+    ui.updateCharts(model.getHistory());
+    ui.updateDailySummary(model.getSummary(result.data));
+    ui.updateSimulationSource({ sourceLabel: result.sourceLabel });
+    ui.updateScenarioStatus('Live baseline');
+  }
+}
+
+async function simulateDays(days) {
+  if (baselineSnapshot) {
+    model.setSnapshot(baselineSnapshot);
+  }
+
+  const seriesResult = await weather.fetchDailySeries(days);
+  const series = seriesResult.series || [];
+  const sourceLabel = seriesResult.sourceLabel;
+  const filteredSeries = series.filter((day) => {
+    const dayKey = toDateKey(day.date);
+    return !lastObservedDateKey || dayKey !== lastObservedDateKey;
+  });
+
+  filteredSeries.forEach((day) => {
+    model.applyDailyObservation(day, sourceLabel);
+  });
+
+  ui.updateModelOutputs(model.getState());
+  ui.setChartWindow(days);
+  ui.updateCharts(model.getHistory());
+  const lastDay = filteredSeries[filteredSeries.length - 1] || series[series.length - 1];
+  if (lastDay) {
+    ui.updateDailySummary(model.getSummary(lastDay));
+  }
+  ui.updateSimulationSource(seriesResult);
+}
+
+ui.onRefresh(async () => {
+  await loadCurrentConditions(true);
+});
+
+ui.onSimulate(async (days) => {
+  await simulateDays(days);
+});
+
+ui.onScenarioSimulate(async (days, scenario) => {
+  if (baselineSnapshot) {
+    model.setSnapshot(baselineSnapshot);
+  }
+  const scenarioResult = await weather.fetchScenarioSeries(
+    days,
+    scenario,
+    lastObservedData
+  );
+  const series = scenarioResult.series || [];
+  const filteredSeries = series.filter((day) => {
+    const dayKey = toDateKey(day.date);
+    return !lastObservedDateKey || dayKey !== lastObservedDateKey;
+  });
+
+  filteredSeries.forEach((day) => {
+    model.applyDailyObservation(day, scenarioResult.sourceLabel);
+  });
+
+  const lastDay = filteredSeries[filteredSeries.length - 1] || series[series.length - 1];
+  if (lastDay) {
+    ui.updateCurrentConditions({
+      ok: true,
+      data: {
+        ...lastDay,
+        humidity: lastObservedData?.humidity ?? 0,
+        pressure: lastObservedData?.pressure ?? 0,
+        timezoneAbbr: lastObservedData?.timezoneAbbr || 'UTC'
+      }
     });
-} else {
-    new GlacierSimulator();
-}
+    ui.updateDailySummary(model.getSummary(lastDay));
+  }
+
+  ui.updateModelOutputs(model.getState());
+  ui.setChartWindow(7);
+  ui.updateCharts(model.getHistory());
+  ui.updateSimulationSource({ sourceLabel: scenarioResult.sourceLabel });
+  ui.updateScenarioStatus(scenarioResult.sourceLabel.replace('Scenario: ', ''));
+  ui.updateDataStatus({ mode: 'scenario' });
+});
+
+ui.onScenarioSelect(async (scenario) => {
+  await ui.onScenarioSimulateCallback?.(7, scenario);
+});
+
+loadCurrentConditions();
