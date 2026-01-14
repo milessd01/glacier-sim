@@ -17,6 +17,7 @@ export class Glacier {
         this.glacierMesh = null;
         this.lakeMesh = null;
         this.iceEdgeMesh = null;
+        this.valleyFloor = null;
         this.valleyWalls = [];
         this.backgroundTexture = null;
         this.noise2D = createNoise2D();
@@ -61,16 +62,16 @@ export class Glacier {
         // Load background image
         await this.loadBackgroundImage();
         
-        // Camera setup - wide FOV for cinematic view
+        // Camera setup - overhead valley view
         this.camera = new THREE.PerspectiveCamera(
-            50, // Wide FOV (45-60 range)
+            38, // Slightly tighter for better scale
             window.innerWidth / window.innerHeight,
             0.1,
             1000
         );
-        // Position camera so glacier tongue sits mid-frame with lake foreground visible
-        this.camera.position.set(0, 15, 45);
-        this.camera.lookAt(0, 5, 0);
+        // Position camera above the valley looking down toward glacier
+        this.camera.position.set(0, 92, 68);
+        this.camera.lookAt(0, 5, -10);
         
         // Renderer setup with physically correct settings
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -86,17 +87,18 @@ export class Glacier {
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
         this.controls.enableDamping = true;
         this.controls.dampingFactor = 0.05;
-        this.controls.target.set(0, 5, 0); // Target at glacier center
-        this.controls.minDistance = 25;
-        this.controls.maxDistance = 120;
-        this.controls.maxPolarAngle = Math.PI / 2.3; // Prevent going below horizon
-        this.controls.minPolarAngle = Math.PI / 4; // Prevent looking straight down
+        this.controls.target.set(0, 5, -10); // Target at glacier center
+        this.controls.minDistance = 70;
+        this.controls.maxDistance = 200;
+        this.controls.maxPolarAngle = Math.PI / 2.2; // Prevent going below horizon
+        this.controls.minPolarAngle = Math.PI / 10; // Encourage overhead view
         
         // Photo-matched lighting
         this.setupLighting();
         
         // Create scene elements
         this.createValleyWalls();
+        this.createValleyFloor();
         this.createLake();
         this.createIceEdge();
         this.createGlacierTongue();
@@ -109,34 +111,8 @@ export class Glacier {
      * Load background image (sky + mountains)
      */
     async loadBackgroundImage() {
-        try {
-            const textureLoader = new THREE.TextureLoader();
-            this.backgroundTexture = await new Promise((resolve, reject) => {
-                textureLoader.load(
-                    '/assets/reference.jpg',
-                    (texture) => {
-                        texture.colorSpace = THREE.SRGBColorSpace;
-                        resolve(texture);
-                    },
-                    undefined,
-                    (error) => {
-                        console.warn('Background image not found, using solid color:', error);
-                        resolve(null);
-                    }
-                );
-            });
-            
-            if (this.backgroundTexture) {
-                // Use as scene background
-                this.scene.background = this.backgroundTexture;
-            } else {
-                // Fallback to sky blue
-                this.scene.background = new THREE.Color(0x87CEEB);
-            }
-        } catch (error) {
-            console.warn('Failed to load background image:', error);
-            this.scene.background = new THREE.Color(0x87CEEB);
-        }
+        // Neutral grey background to keep focus on the valley + glacier
+        this.scene.background = new THREE.Color(0x9a9a9a);
     }
 
     /**
@@ -162,11 +138,11 @@ export class Glacier {
         this.scene.add(directionalLight);
         
         // Hemisphere light for ambient
-        const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x5a5a5a, 0.5);
+        const hemisphereLight = new THREE.HemisphereLight(0xb0b0b0, 0x3a3a3a, 0.3);
         this.scene.add(hemisphereLight);
         
         // Light fog for atmospheric depth
-        this.scene.fog = new THREE.Fog(0x87CEEB, 60, 200);
+        this.scene.fog = new THREE.Fog(0x9a9a9a, 120, 260);
     }
 
     /**
@@ -174,112 +150,97 @@ export class Glacier {
      */
     createValleyWalls() {
         const wallHeight = 40;
-        const wallDepth = 120;
-        const segments = 150; // Heavy subdivision
-        
-        // Left wall
-        const leftWallGeometry = new THREE.PlaneGeometry(60, wallDepth, segments, segments);
-        const leftPositions = leftWallGeometry.attributes.position;
-        const leftVertices = leftPositions.array;
-        const leftColors = new Float32Array(leftVertices.length);
-        
-        for (let i = 0; i < leftVertices.length; i += 3) {
-            const x = leftVertices[i];
-            const z = leftVertices[i + 2];
-            
-            // Lower-frequency noise for gradual rock displacement
-            const scale1 = 0.05;
-            const scale2 = 0.1;
-            const height1 = this.noise2D(x * scale1, z * scale1) * 8;
-            const height2 = this.noise2D(x * scale2, z * scale2) * 4;
-            
-            // Base height decreases toward valley center
-            const distanceFromValley = Math.abs(x + 30);
-            const baseHeight = Math.max(0, (30 - distanceFromValley) / 30) * wallHeight;
-            
-            leftVertices[i + 1] = baseHeight + height1 + height2;
-            
-            // Color variation - dark rock with brown/grey variations
-            const colorNoise = this.noise2D(x * 0.1, z * 0.1);
-            const r = 0.2 + colorNoise * 0.1; // 0.2 to 0.3 (dark grey-brown)
-            const g = 0.22 + colorNoise * 0.08;
-            const b = 0.25 + colorNoise * 0.1;
-            
-            leftColors[i] = r;
-            leftColors[i + 1] = g;
-            leftColors[i + 2] = b;
+        const wallDepth = 140;
+        const segments = 120; // Heavy subdivision
+
+        const buildWall = (side) => {
+            const geometry = new THREE.PlaneGeometry(wallDepth, wallHeight, segments, segments);
+            const positions = geometry.attributes.position;
+            const vertices = positions.array;
+            const colors = new Float32Array(vertices.length);
+            const noiseOffset = side === 'left' ? 0 : 2000;
+
+            for (let i = 0; i < vertices.length; i += 3) {
+                const depth = vertices[i];
+                const height = vertices[i + 1];
+
+                // Rock displacement along the wall normal
+                const scale1 = 0.05;
+                const scale2 = 0.1;
+                const height1 = this.noise2D((depth + noiseOffset) * scale1, (height + noiseOffset) * scale1) * 4;
+                const height2 = this.noise2D((depth + noiseOffset) * scale2, (height + noiseOffset) * scale2) * 2;
+                const heightFactor = (height + wallHeight / 2) / wallHeight;
+                vertices[i + 2] = (height1 + height2) * (0.4 + heightFactor * 0.6);
+
+                // Color variation - neutral grey rock
+                const colorNoise = this.noise2D((depth + noiseOffset) * 0.08, (height + noiseOffset) * 0.08);
+                const r = 0.28 + colorNoise * 0.08;
+                const g = 0.29 + colorNoise * 0.08;
+                const b = 0.3 + colorNoise * 0.08;
+
+                colors[i] = r;
+                colors[i + 1] = g;
+                colors[i + 2] = b;
+            }
+
+            geometry.computeVertexNormals();
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+            const material = new THREE.MeshStandardMaterial({
+                vertexColors: true,
+                roughness: 0.9,
+                metalness: 0.0
+            });
+
+            const wall = new THREE.Mesh(geometry, material);
+            wall.rotation.y = side === 'left' ? Math.PI / 2 : -Math.PI / 2;
+            wall.position.set(side === 'left' ? -55 : 55, wallHeight / 2, -5);
+            wall.castShadow = true;
+            wall.receiveShadow = true;
+            this.scene.add(wall);
+            this.valleyWalls.push(wall);
+        };
+
+        buildWall('left');
+        buildWall('right');
+    }
+
+    /**
+     * Create valley floor with subtle undulation
+     */
+    createValleyFloor() {
+        const floorGeometry = new THREE.PlaneGeometry(140, 240, 120, 200);
+        const positions = floorGeometry.attributes.position;
+        const vertices = positions.array;
+
+        for (let i = 0; i < vertices.length; i += 3) {
+            const x = vertices[i];
+            const z = vertices[i + 1];
+            const noise = this.noise2D(x * 0.06, z * 0.06) * 1.2;
+            const centerFalloff = 1 - Math.min(1, Math.abs(x) / 60);
+            vertices[i + 2] = noise * centerFalloff;
         }
-        
-        leftWallGeometry.computeVertexNormals();
-        leftWallGeometry.setAttribute('color', new THREE.BufferAttribute(leftColors, 3));
-        
-        const leftWallMaterial = new THREE.MeshStandardMaterial({
-            vertexColors: true,
-            roughness: 0.9,
+
+        floorGeometry.computeVertexNormals();
+
+        const floorMaterial = new THREE.MeshStandardMaterial({
+            color: 0x5b5b5b,
+            roughness: 0.95,
             metalness: 0.0
         });
-        
-        const leftWall = new THREE.Mesh(leftWallGeometry, leftWallMaterial);
-        leftWall.rotation.x = -Math.PI / 2;
-        leftWall.position.set(-30, 0, 0);
-        leftWall.castShadow = true;
-        leftWall.receiveShadow = true;
-        this.scene.add(leftWall);
-        this.valleyWalls.push(leftWall);
-        
-        // Right wall (mirrored)
-        const rightWallGeometry = new THREE.PlaneGeometry(60, wallDepth, segments, segments);
-        const rightPositions = rightWallGeometry.attributes.position;
-        const rightVertices = rightPositions.array;
-        const rightColors = new Float32Array(rightVertices.length);
-        
-        for (let i = 0; i < rightVertices.length; i += 3) {
-            const x = rightVertices[i];
-            const z = rightVertices[i + 2];
-            
-            const scale1 = 0.05;
-            const scale2 = 0.1;
-            const height1 = this.noise2D(x * scale1 + 2000, z * scale1 + 2000) * 8;
-            const height2 = this.noise2D(x * scale2 + 2000, z * scale2 + 2000) * 4;
-            
-            const distanceFromValley = Math.abs(x - 30);
-            const baseHeight = Math.max(0, (30 - distanceFromValley) / 30) * wallHeight;
-            
-            rightVertices[i + 1] = baseHeight + height1 + height2;
-            
-            const colorNoise = this.noise2D(x * 0.1 + 2000, z * 0.1 + 2000);
-            const r = 0.2 + colorNoise * 0.1;
-            const g = 0.22 + colorNoise * 0.08;
-            const b = 0.25 + colorNoise * 0.1;
-            
-            rightColors[i] = r;
-            rightColors[i + 1] = g;
-            rightColors[i + 2] = b;
-        }
-        
-        rightWallGeometry.computeVertexNormals();
-        rightWallGeometry.setAttribute('color', new THREE.BufferAttribute(rightColors, 3));
-        
-        const rightWallMaterial = new THREE.MeshStandardMaterial({
-            vertexColors: true,
-            roughness: 0.9,
-            metalness: 0.0
-        });
-        
-        const rightWall = new THREE.Mesh(rightWallGeometry, rightWallMaterial);
-        rightWall.rotation.x = -Math.PI / 2;
-        rightWall.position.set(30, 0, 0);
-        rightWall.castShadow = true;
-        rightWall.receiveShadow = true;
-        this.scene.add(rightWall);
-        this.valleyWalls.push(rightWall);
+
+        this.valleyFloor = new THREE.Mesh(floorGeometry, floorMaterial);
+        this.valleyFloor.rotation.x = -Math.PI / 2;
+        this.valleyFloor.position.set(0, -2, -10);
+        this.valleyFloor.receiveShadow = true;
+        this.scene.add(this.valleyFloor);
     }
 
     /**
      * Create realistic lake foreground
      */
     createLake() {
-        const lakeGeometry = new THREE.PlaneGeometry(100, 80, 100, 80);
+        const lakeGeometry = new THREE.PlaneGeometry(70, 50, 80, 60);
         const positions = lakeGeometry.attributes.position;
         const vertices = positions.array;
         
@@ -304,7 +265,7 @@ export class Glacier {
         
         this.lakeMesh = new THREE.Mesh(lakeGeometry, lakeMaterial);
         this.lakeMesh.rotation.x = -Math.PI / 2;
-        this.lakeMesh.position.set(0, 0.5, 35); // Foreground position
+        this.lakeMesh.position.set(0, 0.4, 70); // Foreground position
         this.lakeMesh.receiveShadow = true;
         this.scene.add(this.lakeMesh);
     }
@@ -313,7 +274,7 @@ export class Glacier {
      * Create thin ice/snow edge along lake shore
      */
     createIceEdge() {
-        const iceGeometry = new THREE.PlaneGeometry(100, 15, 50, 15);
+        const iceGeometry = new THREE.PlaneGeometry(70, 12, 50, 12);
         const positions = iceGeometry.attributes.position;
         const vertices = positions.array;
         
@@ -336,7 +297,7 @@ export class Glacier {
         
         this.iceEdgeMesh = new THREE.Mesh(iceGeometry, iceMaterial);
         this.iceEdgeMesh.rotation.x = -Math.PI / 2;
-        this.iceEdgeMesh.position.set(0, 0.6, 35); // Slightly elevated above lake
+        this.iceEdgeMesh.position.set(0, 0.6, 66); // Slightly elevated above lake
         this.iceEdgeMesh.receiveShadow = true;
         this.scene.add(this.iceEdgeMesh);
     }
@@ -346,7 +307,7 @@ export class Glacier {
      */
     createGlacierTongue() {
         const segments = 300; // >= 300x300 segments
-        const geometry = new THREE.PlaneGeometry(50, 80, segments, segments);
+        const geometry = new THREE.PlaneGeometry(80, 140, segments, segments);
         
         const positions = geometry.attributes.position;
         const vertices = positions.array;
@@ -396,15 +357,15 @@ export class Glacier {
             const isCrevasse = crevasseNoise < -0.3;
             
             if (isCrevasse) {
-                // Blue tint for crevasses
-                colors[i] = 0.85;
-                colors[i + 1] = 0.9;
-                colors[i + 2] = 1.0;
+                // Light blue tint for crevasses
+                colors[i] = 0.75;
+                colors[i + 1] = 0.85;
+                colors[i + 2] = 0.98;
             } else {
-                // White peaks, slight blue in valleys
-                const r = 0.95 + normalizedHeight * 0.05;
-                const g = 0.97 + normalizedHeight * 0.03;
-                const b = 1.0;
+                // Light blue glacier body
+                const r = 0.78 + normalizedHeight * 0.07;
+                const g = 0.88 + normalizedHeight * 0.06;
+                const b = 0.98;
                 colors[i] = r;
                 colors[i + 1] = g;
                 colors[i + 2] = b;
@@ -418,7 +379,7 @@ export class Glacier {
         // MeshPhysicalMaterial for ice with blue subsurface tint
         const material = new THREE.MeshPhysicalMaterial({
             vertexColors: true,
-            color: 0xF0F8FF, // Near-white base color
+            color: 0xbfe6ff, // Light blue base color
             roughness: 0.6 + (100 - this.massIndex) / 100 * 0.2, // Subtle roughness change with mass
             metalness: 0.0,
             transmission: 0.1, // Slight transmission for ice
@@ -427,7 +388,7 @@ export class Glacier {
         
         this.glacierMesh = new THREE.Mesh(geometry, material);
         this.glacierMesh.rotation.x = -Math.PI / 2; // Rotate flat
-        this.glacierMesh.position.set(0, 8, -20); // Position mid-frame
+        this.glacierMesh.position.set(0, 6, -15); // Center between walls and lake
         this.glacierMesh.castShadow = true;
         this.glacierMesh.receiveShadow = true;
         this.scene.add(this.glacierMesh);
@@ -535,13 +496,13 @@ export class Glacier {
             const isCrevasse = crevasseNoise < -0.3;
             
             if (isCrevasse) {
-                colors.array[i] = 0.85;
-                colors.array[i + 1] = 0.9;
-                colors.array[i + 2] = 1.0;
+                colors.array[i] = 0.75;
+                colors.array[i + 1] = 0.85;
+                colors.array[i + 2] = 0.98;
             } else {
-                const r = 0.95 + normalizedHeight * 0.05;
-                const g = 0.97 + normalizedHeight * 0.03;
-                const b = 1.0;
+                const r = 0.78 + normalizedHeight * 0.07;
+                const g = 0.88 + normalizedHeight * 0.06;
+                const b = 0.98;
                 colors.array[i] = r;
                 colors.array[i + 1] = g;
                 colors.array[i + 2] = b;
