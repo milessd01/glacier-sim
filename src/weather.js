@@ -8,48 +8,166 @@ function seededRandom(seed) {
 }
 
 export class WeatherService {
-  constructor({ latitude, longitude, name, timezone }) {
+  constructor({ latitude, longitude, name, timezone, provider }) {
     this.latitude = latitude;
     this.longitude = longitude;
     this.name = name;
     this.timezone = timezone || 'auto';
+    this.provider = provider || 'open-meteo';
+    this.cache = {
+      current: null,
+      fetchedAt: 0
+    };
   }
 
-  async fetchCurrent() {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${this.latitude}&longitude=${this.longitude}&current=temperature_2m,wind_speed_10m,precipitation,relative_humidity_2m,surface_pressure&timezone=${this.timezone}`;
+  async fetchCurrent({ force = false } = {}) {
+    const now = Date.now();
+    if (!force && this.cache.current && now - this.cache.fetchedAt < 5 * 60 * 1000) {
+      return this.cache.current;
+    }
 
     try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`Weather request failed: ${response.status}`);
+      let result;
+      if (this.provider === 'nws') {
+        result = await this.fetchNwsCurrent();
+      } else if (this.provider === 'nws-hybrid') {
+        result = await this.fetchHybridCurrent();
+      } else {
+        result = await this.fetchOpenMeteoCurrent();
       }
-      const data = await response.json();
-      const current = data.current || {};
-      const timestamp = current.time || data.current_time;
-      const timezone = data.timezone || 'UTC';
-      const timezoneAbbr = data.timezone_abbreviation || 'UTC';
-
-      return {
-        ok: true,
-        sourceLabel: 'Observed',
-        data: {
-          temperature: current.temperature_2m ?? 0,
-          windSpeed: current.wind_speed_10m ?? 0,
-          precipitation: current.precipitation ?? 0,
-          humidity: current.relative_humidity_2m ?? 0,
-          pressure: current.surface_pressure ?? 0,
-          date: timestamp ? new Date(timestamp) : new Date(),
-          timezone,
-          timezoneAbbr
-        }
-      };
+      this.cache.current = result;
+      this.cache.fetchedAt = now;
+      return result;
     } catch (error) {
-      return {
+      const result = {
         ok: false,
         sourceLabel: 'Fallback',
         error
       };
+      this.cache.current = result;
+      this.cache.fetchedAt = now;
+      return result;
     }
+  }
+
+  async fetchOpenMeteoCurrent() {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${this.latitude}&longitude=${this.longitude}&current=temperature_2m,wind_speed_10m,precipitation,relative_humidity_2m,surface_pressure&timezone=${this.timezone}`;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`Weather request failed: ${response.status}`);
+    }
+    const data = await response.json();
+    const current = data.current || {};
+    const timestamp = current.time || data.current_time;
+    const timezone = data.timezone || 'UTC';
+    const timezoneAbbr = data.timezone_abbreviation || 'UTC';
+
+    return {
+      ok: true,
+      sourceLabel: 'Observed',
+      data: {
+        temperature: current.temperature_2m ?? 0,
+        windSpeed: current.wind_speed_10m ?? 0,
+        precipitation: current.precipitation ?? 0,
+        humidity: current.relative_humidity_2m ?? 0,
+        pressure: current.surface_pressure ?? 0,
+        date: timestamp ? new Date(timestamp) : new Date(),
+        timezone,
+        timezoneAbbr
+      }
+    };
+  }
+
+  async fetchNwsCurrent() {
+    const pointUrl = `https://api.weather.gov/points/${this.latitude},${this.longitude}`;
+    const pointResponse = await fetch(pointUrl, {
+      headers: {
+        'User-Agent': 'Glacier Mission Control (glacier-sim)',
+        Accept: 'application/geo+json'
+      }
+    });
+    if (!pointResponse.ok) {
+      throw new Error(`NWS point lookup failed: ${pointResponse.status}`);
+    }
+    const pointData = await pointResponse.json();
+    const stationsUrl = pointData?.properties?.observationStations;
+    if (!stationsUrl) {
+      throw new Error('NWS stations URL missing');
+    }
+
+    const stationsResponse = await fetch(stationsUrl, {
+      headers: {
+        'User-Agent': 'Glacier Mission Control (glacier-sim)',
+        Accept: 'application/geo+json'
+      }
+    });
+    if (!stationsResponse.ok) {
+      throw new Error(`NWS stations lookup failed: ${stationsResponse.status}`);
+    }
+    const stationsData = await stationsResponse.json();
+    const stationId = stationsData?.features?.[0]?.properties?.stationIdentifier;
+    if (!stationId) {
+      throw new Error('No NWS station found for location');
+    }
+
+    const obsUrl = `https://api.weather.gov/stations/${stationId}/observations/latest`;
+    const obsResponse = await fetch(obsUrl, {
+      headers: {
+        'User-Agent': 'Glacier Mission Control (glacier-sim)',
+        Accept: 'application/geo+json'
+      }
+    });
+    if (!obsResponse.ok) {
+      throw new Error(`NWS observation failed: ${obsResponse.status}`);
+    }
+    const obsData = await obsResponse.json();
+    const obs = obsData?.properties || {};
+
+    const temperature = obs.temperature?.value;
+    const windSpeedMs = obs.windSpeed?.value;
+    const humidity = obs.relativeHumidity?.value;
+    const pressurePa = obs.seaLevelPressure?.value || obs.barometricPressure?.value;
+    const precipitation = obs.precipitationLastHour?.value || 0;
+    const timestamp = obs.timestamp;
+    const timezone = obsData?.properties?.timeZone || 'UTC';
+    const timezoneAbbr = obs.timeZone || 'UTC';
+
+    return {
+      ok: true,
+      sourceLabel: 'Observed (NWS)',
+      data: {
+        temperature: typeof temperature === 'number' ? temperature : 0,
+        windSpeed: typeof windSpeedMs === 'number' ? windSpeedMs * 3.6 : 0,
+        precipitation: typeof precipitation === 'number' ? precipitation : 0,
+        humidity: typeof humidity === 'number' ? humidity : 0,
+        pressure: typeof pressurePa === 'number' ? pressurePa / 100 : 0,
+        date: timestamp ? new Date(timestamp) : new Date(),
+        timezone,
+        timezoneAbbr
+      }
+    };
+  }
+
+  async fetchHybridCurrent() {
+    const [nws, meteo] = await Promise.all([
+      this.fetchNwsCurrent(),
+      this.fetchOpenMeteoCurrent()
+    ]);
+
+    return {
+      ok: true,
+      sourceLabel: 'Observed (NWS + Open-Meteo)',
+      data: {
+        temperature: nws.data.temperature,
+        windSpeed: nws.data.windSpeed,
+        precipitation: meteo.data.precipitation,
+        humidity: meteo.data.humidity,
+        pressure: meteo.data.pressure,
+        date: nws.data.date || meteo.data.date,
+        timezone: meteo.data.timezone || nws.data.timezone,
+        timezoneAbbr: meteo.data.timezoneAbbr || nws.data.timezoneAbbr
+      }
+    };
   }
 
   async fetchDailySeries(days) {

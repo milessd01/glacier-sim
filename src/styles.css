@@ -41,6 +41,35 @@ body {
   margin-bottom: 28px;
 }
 
+.glacier-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.glacier-selector label {
+  font-size: 12px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.glacier-selector select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.coordinates {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
 .eyebrow {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 12px;

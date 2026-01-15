@@ -52,6 +52,16 @@ export class DashboardUI {
       timeToLossValue: document.getElementById('time-to-loss-value'),
       timeToLossMeta: document.getElementById('time-to-loss-meta'),
       timeToLossSource: document.getElementById('time-to-loss-source'),
+      glacierSubtitle: document.getElementById('glacier-subtitle'),
+      glacierCoordinates: document.getElementById('glacier-coordinates'),
+      glacierSelect: document.getElementById('glacier-select'),
+      glacierInfoButton: document.getElementById('glacier-info'),
+      infoTitle: document.getElementById('info-title'),
+      infoSubtitle: document.getElementById('info-subtitle'),
+      infoOrigin: document.getElementById('info-origin'),
+      infoTimeline: document.getElementById('info-timeline'),
+      infoFacts: document.getElementById('info-facts'),
+      infoMatters: document.getElementById('info-matters'),
       chartHealth: document.getElementById('chart-health'),
       chartMass: document.getElementById('chart-mass')
     };
@@ -60,6 +70,11 @@ export class DashboardUI {
   bindEvents() {
     this.elements.refreshButton?.addEventListener('click', () => {
       this.onRefreshCallback?.();
+    });
+
+    this.elements.glacierSelect?.addEventListener('change', (event) => {
+      const glacierId = event.target.value;
+      this.onGlacierChangeCallback?.(glacierId);
     });
 
     this.elements.simulateButtons?.forEach((button) => {
@@ -292,6 +307,10 @@ export class DashboardUI {
     this.onScenarioSelectCallback = callback;
   }
 
+  onGlacierChange(callback) {
+    this.onGlacierChangeCallback = callback;
+  }
+
   setScenario(value) {
     this.currentScenario = value;
     this.elements.scenarioButtons?.forEach((button) => {
@@ -308,6 +327,52 @@ export class DashboardUI {
 
     if (!enabled) {
       this.setScenario(null);
+    }
+  }
+
+  updateGlacierHeader(glacier) {
+    if (this.elements.glacierSubtitle) {
+      this.elements.glacierSubtitle.textContent = `${glacier.displayName} operations and diagnostics.`;
+    }
+    if (this.elements.glacierCoordinates) {
+      this.elements.glacierCoordinates.textContent = `${glacier.region} • ${glacier.latitude.toFixed(
+        3
+      )}N, ${Math.abs(glacier.longitude).toFixed(3)}W`;
+    }
+    if (this.elements.glacierSelect) {
+      this.elements.glacierSelect.value = glacier.id;
+    }
+    if (this.elements.glacierInfoButton) {
+      this.elements.glacierInfoButton.textContent = `${glacier.displayName} Info`;
+    }
+  }
+
+  updateInfoContent(glacier) {
+    if (this.elements.infoTitle) {
+      this.elements.infoTitle.textContent = glacier.displayName;
+    }
+    if (this.elements.infoSubtitle) {
+      this.elements.infoSubtitle.textContent = glacier.info.subtitle;
+    }
+    if (this.elements.infoOrigin) {
+      this.elements.infoOrigin.innerHTML = glacier.info.origin
+        .map((paragraph) => `<p>${paragraph}</p>`)
+        .join('');
+    }
+    if (this.elements.infoTimeline) {
+      this.elements.infoTimeline.innerHTML = glacier.info.timeline
+        .map((item) => `<li>${item}</li>`)
+        .join('');
+    }
+    if (this.elements.infoFacts) {
+      this.elements.infoFacts.innerHTML = glacier.info.facts
+        .map((item) => `<li>${item}</li>`)
+        .join('');
+    }
+    if (this.elements.infoMatters) {
+      this.elements.infoMatters.innerHTML = glacier.info.matters
+        .map((paragraph) => `<p>${paragraph}</p>`)
+        .join('');
     }
   }
 

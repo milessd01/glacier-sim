@@ -11,11 +11,19 @@
       <header class="header">
         <div>
           <p class="eyebrow">Glacier Mission Control</p>
-          <h1>Mendenhall Glacier Operations</h1>
-          <p class="subtitle">Live atmospheric inputs and mass-balance diagnostics.</p>
+          <div class="glacier-selector">
+            <label for="glacier-select">Active Glacier</label>
+            <select id="glacier-select">
+              <option value="mendenhall">Mendenhall Glacier</option>
+              <option value="hubbard">Hubbard Glacier</option>
+              <option value="columbia">Columbia Glacier</option>
+            </select>
+          </div>
+          <p id="glacier-subtitle" class="subtitle">Live atmospheric inputs and mass-balance diagnostics.</p>
+          <p id="glacier-coordinates" class="coordinates">--</p>
         </div>
         <div class="header-actions">
-          <button id="glacier-info" class="btn btn-secondary">Mendenhall Glacier Info</button>
+          <button id="glacier-info" class="btn btn-secondary">Glacier Info</button>
           <button id="refresh-weather" class="btn btn-primary">Refresh Data</button>
           <span id="data-status" class="status-pill live">Live data</span>
         </div>
@@ -119,7 +127,7 @@
         <article class="card summary-card">
           <h2>Daily Summary</h2>
           <p id="daily-summary">
-            Loading the latest mission brief for Mendenhall Glacier.
+            Loading the latest mission brief for the selected glacier.
           </p>
         </article>
       </section>
@@ -130,92 +138,27 @@
         <div class="info-header">
           <div>
             <p class="eyebrow">Field Briefing</p>
-            <h2>Mendenhall Glacier</h2>
-            <p class="subtitle">History, context, and fast facts.</p>
+            <h2 id="info-title">Mendenhall Glacier</h2>
+            <p id="info-subtitle" class="subtitle">History, context, and fast facts.</p>
           </div>
           <button id="info-home" class="btn btn-primary">Home</button>
         </div>
         <div class="info-grid">
           <article class="info-block">
             <h3>Origin Story</h3>
-            <p>
-              Mendenhall Glacier (also known by Tlingit names, and once called
-              "Auk Glacier") is a 13 to 13.6 mile long valley glacier in the
-              Mendenhall Valley near Juneau, Alaska. It flows out of the Juneau
-              Icefield, a roughly 1,500 square mile icefield that feeds dozens of
-              glaciers, and terminates at Mendenhall Lake inside the federally
-              managed Mendenhall Glacier Recreation Area within Tongass National
-              Forest.
-            </p>
-            <p>
-              The modern name honors Thomas Corwin Mendenhall (U.S. Coast and
-              Geodetic Survey). John Muir referred to it as "Auk Glacier" in the
-              late 1800s, reflecting the Auke/Aak'w area's Indigenous ties.
-            </p>
+            <div id="info-origin"></div>
           </article>
           <article class="info-block">
             <h3>Timeline Highlights</h3>
-            <ul>
-              <li>
-                Little Ice Age peak to modern retreat: the glacier's maximum advance
-                occurred around the mid-1700s; retreat begins after that period as
-                climate conditions shift.
-              </li>
-              <li>
-                Lake formation: Mendenhall Lake began forming in the early 1900s
-                as the glacier pulled back. Multiple sources note a benchmark around
-                1929 when the lake was created/exposed.
-              </li>
-              <li>
-                Measured retreat: mapped terminus positions show roughly 5,513 meters
-                (18,087 feet / 3.4 miles) of centerline retreat over 261 years
-                (1760 to 2021), with the fastest retreat rates in 2007 to 2011
-                when the terminus interacted with deeper lake water and calving
-                accelerated.
-              </li>
-              <li>
-                Recent milestone: in November 2025, researchers reported the glacier
-                was no longer functionally touching Mendenhall Lake, marking a new
-                phase of retreat.
-              </li>
-            </ul>
+            <ul id="info-timeline"></ul>
           </article>
           <article class="info-block">
             <h3>Fun Facts</h3>
-            <ul>
-              <li>
-                It shapes Juneau's watershed: the glacier feeds Mendenhall Lake and
-                the Mendenhall River, influencing water levels and seasonal flow.
-              </li>
-              <li>
-                Ice caves exist but are unstable and change year to year. Public
-                safety warnings are common because roofs thin and can collapse.
-              </li>
-              <li>
-                It is one of Alaska's most visited easy-access glacier destinations.
-                A Bureau of Land Management release cites about 700,000 visitors
-                annually, and the Forest Service notes the 1962 visitor center
-                historically hosted 400,000+ people per year.
-              </li>
-            </ul>
+            <ul id="info-facts"></ul>
           </article>
           <article class="info-block">
             <h3>Why It Matters</h3>
-            <p>
-              Mendenhall is a visible, local climate signal. NASA notes retreat after
-              the Little Ice Age maximum, with especially steep decline in recent
-              decades tied to regional warming trends. The glacier's retreat changes
-              what visitors can see and access, and researchers expect it may retreat
-              out of view from the visitor center's classic vantage point around
-              2050.
-            </p>
-            <p>
-              There are real community impacts, too: since 2011, Juneau has faced
-              increasing risk from glacial outburst flooding tied to changes in
-              glacier geometry and the formation of an ice-dammed basin (Suicide
-              Basin). The shifting terminus and calving face also create direct
-              safety hazards near the lake edge.
-            </p>
+            <div id="info-matters"></div>
           </article>
         </div>
       </div>

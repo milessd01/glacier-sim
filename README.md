@@ -1,10 +1,11 @@
 # Glacier Mission Control
 
-A graphics-free, data-driven dashboard for monitoring glacier health. It pulls live weather data from Open-Meteo for Mendenhall Glacier (Alaska), runs a mass-balance model, and visualizes trends over the last 30 days.
+A graphics-free, data-driven dashboard for monitoring glacier health across multiple Alaska glaciers. It pulls live weather data from Open-Meteo, runs a mass-balance model, and visualizes trends over the last 30 days.
 
 ## Features
 
 - **Live weather**: temperature, wind speed, precipitation, and timestamp with timezone.
+- **Multi-glacier support**: switch between Mendenhall, Hubbard, and Columbia with isolated histories and baselines.
 - **Mass balance model**: daily mass change, 7-day rolling trend, glacier state badge, and health index.
 - **Simulation controls**: advance the model by 1, 7, or 30 days using Open-Meteo daily forecasts (with a deterministic simulated fallback).
 - **Charts**: 30‑day health index line chart and daily mass change bar chart.
@@ -16,7 +17,9 @@ A graphics-free, data-driven dashboard for monitoring glacier health. It pulls l
 ## Data Sources
 
 - **Open‑Meteo API** (no API key required): https://open-meteo.com/
-- Coordinates: **58.4N, 134.4W** (Mendenhall Glacier)
+- **National Weather Service API** (no API key required): https://www.weather.gov/documentation/services-web-api
+- Coordinates are configured per glacier in `src/main.js` and used for all API requests and simulations.
+- Included glaciers: Mendenhall (Juneau), Hubbard (Yakutat Bay), Columbia (Prince William Sound).
 
 ## Model
 
