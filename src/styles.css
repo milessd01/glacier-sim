@@ -214,6 +214,70 @@ h2 {
   color: var(--danger);
 }
 
+.alert-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.alert-badge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  border: 1px solid transparent;
+}
+
+.alert-badge.warning {
+  background: rgba(255, 199, 102, 0.18);
+  color: #ffc766;
+  border-color: rgba(255, 199, 102, 0.4);
+}
+
+.alert-badge.critical {
+  background: rgba(255, 115, 115, 0.18);
+  color: #ff7373;
+  border-color: rgba(255, 115, 115, 0.4);
+}
+
+.alert-badge.info {
+  background: rgba(99, 179, 255, 0.18);
+  color: #63b3ff;
+  border-color: rgba(99, 179, 255, 0.4);
+}
+
+.confidence-badge {
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.confidence-badge.high {
+  background: rgba(119, 215, 166, 0.2);
+  color: var(--accent-2);
+}
+
+.confidence-badge.medium {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e2e8f0;
+}
+
+.confidence-badge.low {
+  background: rgba(255, 115, 115, 0.2);
+  color: var(--danger);
+}
+
+.projection-value {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 8px 0 6px;
+  color: var(--text);
+}
+
 .status-pill {
   padding: 6px 12px;
   border-radius: 999px;

@@ -35,6 +35,9 @@ export class DashboardUI {
       timestamp: document.getElementById('timestamp'),
       dataStatus: document.getElementById('data-status'),
       glacierState: document.getElementById('glacier-state'),
+      confidenceBadge: document.getElementById('confidence-badge'),
+      confidenceWhy: document.getElementById('confidence-why'),
+      alerts: document.getElementById('alert-badges'),
       healthIndex: document.getElementById('health-index'),
       dailyChange: document.getElementById('daily-change'),
       sevenDayTrend: document.getElementById('seven-day-trend'),
@@ -46,6 +49,9 @@ export class DashboardUI {
       scenarioButtons: document.querySelectorAll('[data-scenario]'),
       chartWindowHealth: document.getElementById('chart-window-health'),
       chartWindowMass: document.getElementById('chart-window-mass'),
+      timeToLossValue: document.getElementById('time-to-loss-value'),
+      timeToLossMeta: document.getElementById('time-to-loss-meta'),
+      timeToLossSource: document.getElementById('time-to-loss-source'),
       chartHealth: document.getElementById('chart-health'),
       chartMass: document.getElementById('chart-mass')
     };
@@ -205,6 +211,43 @@ export class DashboardUI {
     this.elements.sevenDayTrend.textContent = formatNumber(state.sevenDayTrend, 2);
     this.elements.glacierState.textContent = state.state;
     this.elements.glacierState.className = `badge ${state.state.toLowerCase()}`;
+  }
+
+  updateDiagnostics({ alerts, confidence, projection, sourceLabel }) {
+    if (this.elements.alerts) {
+      this.elements.alerts.innerHTML = '';
+      alerts.forEach((alert) => {
+        const badge = document.createElement('span');
+        badge.className = `alert-badge ${alert.level}`;
+        badge.textContent = alert.label;
+        badge.title = alert.detail;
+        this.elements.alerts.appendChild(badge);
+      });
+    }
+
+    if (this.elements.confidenceBadge) {
+      this.elements.confidenceBadge.textContent = confidence.level;
+      this.elements.confidenceBadge.className = `confidence-badge ${confidence.level.toLowerCase()}`;
+    }
+
+    if (this.elements.confidenceWhy) {
+      this.elements.confidenceWhy.textContent = confidence.reasons.join(' • ');
+    }
+
+    if (this.elements.timeToLossValue) {
+      this.elements.timeToLossValue.textContent = projection.message;
+    }
+
+    if (this.elements.timeToLossMeta) {
+      this.elements.timeToLossMeta.textContent =
+        projection.status === 'declining'
+          ? 'Based on 7-day rolling trend.'
+          : 'No collapse projected under current conditions.';
+    }
+
+    if (this.elements.timeToLossSource) {
+      this.elements.timeToLossSource.textContent = `Source: ${sourceLabel}`;
+    }
   }
 
   updateCharts(history) {

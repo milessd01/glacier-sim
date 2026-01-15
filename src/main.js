@@ -34,23 +34,39 @@ function toDateKey(date) {
 
 async function loadCurrentConditions(reset = false) {
   const result = await weather.fetchCurrent();
+  const ageHours = result.data?.date
+    ? (Date.now() - result.data.date.getTime()) / 3600000
+    : null;
+  const isStale = typeof ageHours === 'number' && ageHours > 2;
   ui.updateCurrentConditions(result);
-  ui.updateDataStatus(result);
+  ui.updateDataStatus({ ...result, isStale });
 
   if (result.ok && result.data) {
     const dateKey = toDateKey(result.data.date);
     const shouldAdvance = dateKey && dateKey !== lastObservedDateKey;
     if (reset || shouldAdvance) {
       model.resetWithObservation(result.data, result.sourceLabel);
+      model.setDataContext({
+        sourceLabel: result.sourceLabel,
+        ageHours,
+        isFallback: false,
+        isForecast: false,
+        isScenario: false,
+        isStale
+      });
       baselineSnapshot = model.getSnapshot();
       lastObservedDateKey = dateKey;
       lastObservedData = result.data;
     }
 
+    const alerts = model.getAlerts();
+    const confidence = model.getConfidence();
+    const projection = model.getTimeToLoss();
     ui.updateModelOutputs(model.getState());
+    ui.updateDiagnostics({ alerts, confidence, projection, sourceLabel: result.sourceLabel });
     ui.setChartWindow(30);
     ui.updateCharts(model.getHistory());
-    ui.updateDailySummary(model.getSummary(result.data));
+    ui.updateDailySummary(model.getSummary(result.data, { alerts, confidence, projection }));
     ui.updateSimulationSource({ sourceLabel: result.sourceLabel });
     ui.updateScenarioStatus('Live baseline');
   }
@@ -73,12 +89,26 @@ async function simulateDays(days) {
     model.applyDailyObservation(day, sourceLabel);
   });
 
+  model.setDataContext({
+    sourceLabel,
+    ageHours: null,
+    isFallback: sourceLabel === 'Simulated',
+    isForecast: sourceLabel === 'Forecast',
+    isScenario: false,
+    isStale: sourceLabel === 'Simulated'
+  });
+
+  const alerts = model.getAlerts();
+  const confidence = model.getConfidence();
+  const projection = model.getTimeToLoss();
+
   ui.updateModelOutputs(model.getState());
+  ui.updateDiagnostics({ alerts, confidence, projection, sourceLabel });
   ui.setChartWindow(days);
   ui.updateCharts(model.getHistory());
   const lastDay = filteredSeries[filteredSeries.length - 1] || series[series.length - 1];
   if (lastDay) {
-    ui.updateDailySummary(model.getSummary(lastDay));
+    ui.updateDailySummary(model.getSummary(lastDay, { alerts, confidence, projection }));
   }
   ui.updateSimulationSource(seriesResult);
 }
@@ -110,6 +140,19 @@ ui.onScenarioSimulate(async (days, scenario) => {
     model.applyDailyObservation(day, scenarioResult.sourceLabel);
   });
 
+  model.setDataContext({
+    sourceLabel: scenarioResult.sourceLabel,
+    ageHours: null,
+    isFallback: true,
+    isForecast: false,
+    isScenario: true,
+    isStale: true
+  });
+
+  const alerts = model.getAlerts();
+  const confidence = model.getConfidence();
+  const projection = model.getTimeToLoss();
+
   const lastDay = filteredSeries[filteredSeries.length - 1] || series[series.length - 1];
   if (lastDay) {
     ui.updateCurrentConditions({
@@ -121,10 +164,16 @@ ui.onScenarioSimulate(async (days, scenario) => {
         timezoneAbbr: lastObservedData?.timezoneAbbr || 'UTC'
       }
     });
-    ui.updateDailySummary(model.getSummary(lastDay));
+    ui.updateDailySummary(model.getSummary(lastDay, { alerts, confidence, projection }));
   }
 
   ui.updateModelOutputs(model.getState());
+  ui.updateDiagnostics({
+    alerts,
+    confidence,
+    projection,
+    sourceLabel: scenarioResult.sourceLabel
+  });
   ui.setChartWindow(7);
   ui.updateCharts(model.getHistory());
   ui.updateSimulationSource({ sourceLabel: scenarioResult.sourceLabel });

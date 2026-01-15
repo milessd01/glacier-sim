@@ -8,7 +8,10 @@ A graphics-free, data-driven dashboard for monitoring glacier health. It pulls l
 - **Mass balance model**: daily mass change, 7-day rolling trend, glacier state badge, and health index.
 - **Simulation controls**: advance the model by 1, 7, or 30 days using Open-Meteo daily forecasts (with a deterministic simulated fallback).
 - **Charts**: 30‑day health index line chart and daily mass change bar chart.
-- **Daily summary**: concise, natural‑language explanation of today’s glacier behavior.
+- **Daily summary**: concise, natural-language explanation of today’s glacier behavior.
+- **Alert system**: integrity, loss, melt, acceleration, and data reliability badges.
+- **Time-to-loss projection**: estimate to reach Health Index 40 with confidence notes.
+- **Model confidence**: High/Medium/Low indicator based on data freshness and volatility.
 
 ## Data Sources
 

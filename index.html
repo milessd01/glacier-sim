@@ -61,6 +61,12 @@
             <span>Glacier State</span>
             <strong id="glacier-state" class="badge stable">Stable</strong>
           </div>
+          <div class="metric-row">
+            <span>Model Confidence</span>
+            <strong id="confidence-badge" class="confidence-badge medium">Medium</strong>
+          </div>
+          <p id="confidence-why" class="hint">Evaluating data freshness and variability.</p>
+          <div id="alert-badges" class="alert-badges"></div>
           <p class="hint">Snowfall only counts when temperature is &lt;= 1C.</p>
         </article>
 
@@ -97,6 +103,17 @@
         <article class="card chart-card">
           <h2>Daily Mass Change (<span id="chart-window-mass">30</span> Days)</h2>
           <canvas id="chart-mass" height="160"></canvas>
+        </article>
+
+        <article class="card">
+          <h2>Time-to-Loss Projection</h2>
+          <p class="metric-row">
+            <span>Collapse Threshold</span>
+            <strong>Health Index 40</strong>
+          </p>
+          <p id="time-to-loss-value" class="projection-value">--</p>
+          <p id="time-to-loss-meta" class="hint">Based on 7-day rolling trend.</p>
+          <p id="time-to-loss-source" class="hint">Source: --</p>
         </article>
 
         <article class="card summary-card">
